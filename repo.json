@@ -21,9 +21,9 @@
         },
         {
             "name": "XPrime",
-            "description": "Movies & TV Shows from XPrime",
-            "version": 1,
-            "versionName": "1.0",
+            "description": "Movies & TV Shows from XPrime - Multiple Sources",
+            "version": 2,
+            "versionName": "2.0",
             "lang": "en",
             "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/xprime/xprime.apk",
             "iconUrl": "https://xprime.today/favicon/favicon-96.png",

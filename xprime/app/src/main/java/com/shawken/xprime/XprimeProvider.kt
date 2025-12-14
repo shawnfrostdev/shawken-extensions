@@ -219,10 +219,84 @@ class XprimeProvider(context: Context) : Provider(context) {
                 ))
             }
         } catch (e: Exception) {
-            // Primenet failed
+            // Primenet failed, continue to other sources
         }
         
-        // Add more sources like Fox/Nas if we can solve Turnstile or bypass
+        // Try VidSrc.to
+        try {
+            val vidSrcUrl = if (isTv && season != null && episode != null) {
+                "https://vidsrc.to/embed/tv/$tmdbId/$season/$episode"
+            } else {
+                "https://vidsrc.to/embed/movie/$tmdbId"
+            }
+            
+            links.add(ExtractorLink(
+                source = "VidSrc",
+                name = "VidSrc",
+                url = vidSrcUrl,
+                referer = "https://vidsrc.to/",
+                isM3u8 = false
+            ))
+        } catch (e: Exception) {
+            // VidSrc failed
+        }
+        
+        // Try SuperEmbed
+        try {
+            val superEmbedUrl = if (isTv && season != null && episode != null) {
+                "https://multiembed.mov/?video_id=$tmdbId&tmdb=1&s=$season&e=$episode"
+            } else {
+                "https://multiembed.mov/?video_id=$tmdbId&tmdb=1"
+            }
+            
+            links.add(ExtractorLink(
+                source = "SuperEmbed",
+                name = "SuperEmbed",
+                url = superEmbedUrl,
+                referer = "https://multiembed.mov/",
+                isM3u8 = false
+            ))
+        } catch (e: Exception) {
+            // SuperEmbed failed
+        }
+        
+        // Try VidSrc.pro
+        try {
+            val vidSrcProUrl = if (isTv && season != null && episode != null) {
+                "https://vidsrc.pro/embed/tv/$tmdbId/$season/$episode"
+            } else {
+                "https://vidsrc.pro/embed/movie/$tmdbId"
+            }
+            
+            links.add(ExtractorLink(
+                source = "VidSrc Pro",
+                name = "VidSrc Pro",
+                url = vidSrcProUrl,
+                referer = "https://vidsrc.pro/",
+                isM3u8 = false
+            ))
+        } catch (e: Exception) {
+            // VidSrc Pro failed
+        }
+        
+        // Try 2embed
+        try {
+            val embedUrl = if (isTv && season != null && episode != null) {
+                "https://www.2embed.cc/embedtv/$tmdbId&s=$season&e=$episode"
+            } else {
+                "https://www.2embed.cc/embed/$tmdbId"
+            }
+            
+            links.add(ExtractorLink(
+                source = "2embed",
+                name = "2embed",
+                url = embedUrl,
+                referer = "https://www.2embed.cc/",
+                isM3u8 = false
+            ))
+        } catch (e: Exception) {
+            // 2embed failed
+        }
         
         return links
     }
