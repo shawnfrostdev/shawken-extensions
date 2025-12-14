@@ -8,8 +8,8 @@
         {
             "name": "UHDMovies",
             "description": "Watch movies and TV shows from UHDMovies",
-            "version": 1,
-            "versionName": "1.0",
+            "version": 2,
+            "versionName": "2.0",
             "lang": "en",
             "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/uhdmovies/uhdmovies.apk",
             "iconUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/uhdmovies/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
