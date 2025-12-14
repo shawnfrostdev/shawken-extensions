@@ -128,15 +128,24 @@ class XprimeProvider(context: Context) : Provider(context) {
                                     val epNum = ep.optInt("episode_number")
                                     val epName = ep.optString("name")
                                     val epDate = ep.optString("air_date")
-                                    val stillPath = ep.optString("still_path")
-                                    val epPoster = if (stillPath.isNotEmpty() && stillPath != "null") "https://image.tmdb.org/t/p/original$stillPath" else null
                                     
+                                    val stillPath = ep.optString("still_path")
+                                    val seasonPosterPath = sJson.optString("poster_path")
+                                    
+                                    val epThumb = if (stillPath.isNotEmpty() && stillPath != "null") {
+                                        "https://image.tmdb.org/t/p/w300$stillPath"
+                                    } else if (seasonPosterPath.isNotEmpty() && seasonPosterPath != "null") {
+                                        "https://image.tmdb.org/t/p/w300$seasonPosterPath"
+                                    } else {
+                                        posterUrl // Fallback to show poster (original or w500 depending on what we fetched earlier, actually posterUrl is 'original' here)
+                                    }
+
                                     episodes.add(Episode(
                                         name = epName,
                                         season = seasonNumber,
                                         episode = epNum,
                                         dataUrl = "tv:$id:$seasonNumber:$epNum",
-                                        posterUrl = epPoster,
+                                        posterUrl = epThumb,
                                         description = ep.optString("overview"),
                                         date = epDate
                                     ))
