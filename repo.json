@@ -3,20 +3,34 @@
     "description": "Official extension repository for Shawken",
     "author": "Shawken",
     "url": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/repo.json",
-    "version": "1.0.0",
+    "version": 1,
     "extensions": [
         {
             "name": "UHDMovies",
             "description": "Watch movies and TV shows from UHDMovies",
-            "version": "1",
+            "version": 1,
             "versionName": "1.0",
             "lang": "en",
             "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/uhdmovies/uhdmovies.apk",
             "iconUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/uhdmovies/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
-            "sha256": "placeholder",
-            "minAppVersion": "1.0.0",
+            "sha256": null,
+            "minAppVersion": 1,
             "sources": [
                 "https://uhdmovies.fun"
+            ]
+        },
+        {
+            "name": "XPrime",
+            "description": "Movies & TV Shows from XPrime",
+            "version": 1,
+            "versionName": "1.0",
+            "lang": "en",
+            "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/xprime/xprime.apk",
+            "iconUrl": "https://xprime.today/favicon/favicon-96.png",
+            "sha256": null,
+            "minAppVersion": 1,
+            "sources": [
+                "https://xprime.today"
             ]
         }
     ]

@@ -1,0 +1,21 @@
+{
+  "name": "Shawken Extensions Repository",
+  "description": "Official extensions repository for Shawken streaming app",
+  "author": "shawnfrostdev",
+  "url": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/repo.json",
+  "version": 1,
+  "extensions": [
+    {
+      "name": "Test Provider",
+      "description": "A test extension with hardcoded sample data for testing",
+      "version": 1,
+      "versionName": "1.0.0",
+      "lang": "en",
+      "apkUrl": "https://github.com/shawnfrostdev/shawken-extensions/releases/download/v1.0.0/TestProvider.apk",
+      "iconUrl": null,
+      "sha256": null,
+      "minAppVersion": 0,
+      "sources": ["Test Source"]
+    }
+  ]
+}
