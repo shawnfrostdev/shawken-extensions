@@ -2,50 +2,74 @@
     "name": "Shawken Extensions",
     "description": "Official extension repository for Shawken",
     "author": "Shawken",
-    "url": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/repo.json",
+    "repositoryUrl": "https://github.com/shawnfrostdev/shawken-extensions",
     "version": 1,
     "extensions": [
         {
             "name": "UHDMovies",
+            "packageName": "com.shawken.uhdmovies",
             "description": "4K Dual Audio Movies, Ultra HD movies, 1080p Movies",
             "version": 1,
             "versionName": "0.1",
-            "lang": "en",
-            "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/uhdmovies/uhdmovies.apk",
+            "language": "en",
+            "authors": [
+                "ShawnFrost"
+            ],
+            "status": 1,
+            "tvTypes": [
+                "Movie",
+                "TvSeries"
+            ],
             "iconUrl": "https://uhdmovies.stream/favicon.ico",
-            "sha256": null,
-            "minAppVersion": 1,
+            "downloadUrl": "https://github.com/shawnfrostdev/shawken-extensions/releases/download/v0.1/uhdmovies-release.aar",
             "sources": [
                 "https://uhdmovies.stream"
-            ]
+            ],
+            "pluginClassName": "com.shawken.uhdmovies.UHDMoviesPlugin"
         },
         {
             "name": "XPrime",
+            "packageName": "com.shawken.xprime",
             "description": "Movies & TV Shows from XPrime - Multiple Sources (VidSrc, Primenet, SuperEmbed)",
             "version": 1,
             "versionName": "0.1",
-            "lang": "en",
-            "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/xprime/xprime.apk",
+            "language": "en",
+            "authors": [
+                "ShawnFrost"
+            ],
+            "status": 1,
+            "tvTypes": [
+                "Movie",
+                "TvSeries"
+            ],
             "iconUrl": "https://xprime.today/favicon/favicon-96.png",
-            "sha256": null,
-            "minAppVersion": 1,
+            "downloadUrl": "https://github.com/shawnfrostdev/shawken-extensions/releases/download/v0.1/xprime-release.aar",
             "sources": [
                 "https://xprime.today"
-            ]
+            ],
+            "pluginClassName": "com.shawken.xprime.XprimePlugin"
         },
         {
             "name": "SCloudX",
+            "packageName": "com.shawken.scloud",
             "description": "Stream movies and TV series from SCloudX",
             "version": 1,
             "versionName": "0.1",
-            "lang": "en",
-            "apkUrl": "https://raw.githubusercontent.com/shawnfrostdev/shawken-extensions/main/scloud/scloud.apk",
+            "language": "en",
+            "authors": [
+                "ShawnFrost"
+            ],
+            "status": 1,
+            "tvTypes": [
+                "Movie",
+                "TvSeries"
+            ],
             "iconUrl": "https://scloudx.lol/favicon.ico",
-            "sha256": null,
-            "minAppVersion": 1,
+            "downloadUrl": "https://github.com/shawnfrostdev/shawken-extensions/releases/download/v0.1/scloud-release.aar",
             "sources": [
                 "https://scloudx.lol"
-            ]
+            ],
+            "pluginClassName": "com.shawken.scloud.SCloudPlugin"
         }
     ]
 }
