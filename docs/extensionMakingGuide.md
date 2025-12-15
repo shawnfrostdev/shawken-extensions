@@ -1,150 +1,183 @@
 # Shawken Extension Development Guide
 
-> **Complete guide to creating extensions for Shawken streaming app**
-
----
+> **Complete reference for creating extensions for Shawken - covers everything from setup to publishing**
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [Prerequisites](#prerequisites)
-3. [Extension Architecture](#extension-architecture)
-4. [Step-by-Step Guide](#step-by-step-guide)
-5. [Provider Interface Reference](#provider-interface-reference)
-6. [Data Classes Reference](#data-classes-reference)
-7. [Example Extension](#example-extension)
-8. [Testing Your Extension](#testing-your-extension)
-9. [Publishing Your Extension](#publishing-your-extension)
-10. [Best Practices](#best-practices)
+2. [Architecture & How Extensions Work](#architecture--how-extensions-work)
+3. [Prerequisites](#prerequisites)
+4. [Quick Start Guide](#quick-start-guide)
+5. [Complete API Reference](#complete-api-reference)
+6. [Main App Integration](#main-app-integration)
+7. [Advanced Topics](#advanced-topics)
+8. [Testing & Debugging](#testing--debugging)
+9. [Publishing](#publishing)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## 🎯 Overview
 
-Shawken extensions are **separate APK files** that provide content to the main app. Each extension implements the `Provider` interface and can search for, load, and extract streaming links from various sources.
+Shawken extensions are **standalone Android APK files** that provide streaming content to the main app. Each extension:
 
-### Key Concepts
+- Is a separate Android application module
+- Implements the `Provider` abstract class from `extension-api`
+- Gets loaded dynamically at runtime by the main app
+- Can scrape and extract content from any streaming source
+- Runs in the main app's context with full Android API access
 
-- **Extension = APK**: Each extension is a standalone Android module compiled to an APK
-- **Provider Interface**: The contract that all extensions must implement
-- **Dynamic Loading**: Extensions are loaded at runtime via reflection
-- **Isolation**: Extensions run in the main app's context but are developed separately
+**Key Point**: Extensions are NOT plugins - they're full Android apps that the main app loads via `PackageManager` and reflection.
+
+---
+
+## 🏗️ Architecture & How Extensions Work
+
+### Extension Loading Flow
+
+```
+1. User installs extension APK (separate from main app)
+2. Main app scans installed packages for extension metadata
+3. ExtensionManager finds packages with "provider_class" meta-data
+4. Main app creates PackageContext for the extension
+5. Uses PathClassLoader to load the Provider class
+6. Instantiates Provider with extension's Context
+7. Provider is now available for search/load/loadLinks operations
+```
+
+### Project Structure
+
+```
+shawken/
+├── app/                          # Main application
+│   ├── extensions/
+│   │   ├── ExtensionManager.kt   # Loads & manages extensions
+│   │   ├── ExtensionInfo.kt      # Repository extension metadata
+│   │   ├── Repository.kt         # Repository JSON structure
+│   │   └── RepositoryManager.kt  # Downloads extensions from repos
+│   └── presentation/
+│       └── extensions/           # Extensions UI
+├── extension-api/                # Shared API module
+│   └── src/main/java/com/shawken/app/api/
+│       └── Provider.kt           # Base class + all data classes
+└── extensions/                   # Your extensions go here
+    └── YourExtension/
+        ├── build.gradle.kts
+        ├── src/main/
+        │   ├── AndroidManifest.xml
+        │   └── java/.../YourProvider.kt
+```
+
+### Critical Files
+
+**extension-api/Provider.kt** - Contains:
+- `abstract class Provider` - Base class for all extensions
+- All data classes: `SearchResponse`, `SearchResult`, `LoadResponse`, `ExtractorLink`, etc.
+- All enums: `ContentType`, `SubtitleFormat`
+- All sealed classes: `Filter`
+
+**app/extensions/ExtensionManager.kt** - Handles:
+- Scanning for installed extension packages
+- Loading Provider classes via reflection
+- Managing loaded providers in memory
+- Package installation verification
 
 ---
 
 ## 📦 Prerequisites
 
-Before creating an extension, ensure you have:
+### Required
 
-- **Android Studio** (latest version)
+- **Android Studio** Arctic Fox or newer
 - **JDK 11** or higher
-- **Kotlin** knowledge
-- **Understanding of web scraping** (HTML parsing, network requests)
-- Access to the **Shawken main app** source code (for the Provider interface)
+- **Kotlin** 1.9.20+
+- **Gradle** 8.0+
+- Access to Shawken source code (for `extension-api` module)
+
+### Knowledge Required
+
+- Kotlin coroutines (all Provider methods are `suspend fun`)
+- HTML parsing (Jsoup)
+- HTTP networking (OkHttp)
+- Android Context and PackageManager basics
 
 ---
 
-## 🏗️ Extension Architecture
+## 🚀 Quick Start Guide
 
-```
-YourExtension/
-├── build.gradle.kts          # Extension module configuration
-├── src/
-│   └── main/
-│       ├── AndroidManifest.xml    # Extension metadata
-│       └── java/
-│           └── com/
-│               └── yourname/
-│                   └── extension/
-│                       └── YourProvider.kt  # Provider implementation
-```
+### Step 1: Create Extension Module
 
----
+**Option A: Using Android Studio**
+1. File → New → New Module
+2. Select "Android Application" (NOT Library - extensions are apps!)
+3. Name: `YourExtensionName`
+4. Package: `com.yourname.extensions.yourextension`
+5. Minimum SDK: 24
 
-## 📝 Step-by-Step Guide
+**Option B: Manual Setup**
+Create folder: `extensions/YourExtension/`
 
-### Step 1: Create a New Android Module
-
-1. In your Shawken project, go to `File > New > New Module`
-2. Select **Android Library**
-3. Name: `YourExtensionName` (e.g., `ExampleProvider`)
-4. Package name: `com.yourname.extension.yourextension`
-5. Click **Finish**
-
-### Step 2: Configure `build.gradle.kts`
-
-Create/modify `YourExtension/build.gradle.kts`:
+### Step 2: Configure build.gradle.kts
 
 ```kotlin
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)  // APPLICATION, not library!
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
-    namespace = "com.yourname.extension.yourextension"
+    namespace = "com.yourname.extensions.yourextension"
     compileSdk = 36
 
     defaultConfig {
+        applicationId = "com.yourname.extensions.yourextension"  // MUST be unique
         minSdk = 24
         
-        // Extension metadata
+        // ⚠️ CRITICAL: These placeholders are used in AndroidManifest.xml
         manifestPlaceholders["providerName"] = "Your Provider Name"
-        manifestPlaceholders["providerLang"] = "en"
-        manifestPlaceholders["providerVersion"] = "1.0.0"
-        manifestPlaceholders["providerClass"] = "com.yourname.extension.yourextension.YourProvider"
+        manifestPlaceholders["providerLang"] = "en"  // ISO 639-1 code
+        manifestPlaceholders["providerVersion"] = "1"  // Integer version code
+        manifestPlaceholders["providerClass"] = "com.yourname.extensions.yourextension.YourProvider"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = false  // Keep false for compatibility
         }
     }
-
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
+    
     kotlinOptions {
         jvmTarget = "11"
     }
 }
 
 dependencies {
-    // Main app dependency (compileOnly - not included in APK)
-    compileOnly(project(":app"))
+    // ⚠️ CRITICAL: Use compileOnly - main app provides these at runtime
+    compileOnly(project(":extension-api"))
     
-    // Kotlin
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.20")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    
-    // Networking
+    // Your extension's dependencies (these WILL be included in APK)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    
-    // HTML Parsing
     implementation("org.jsoup:jsoup:1.17.2")
-    
-    // JSON (optional)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
 ```
 
-### Step 3: Configure `AndroidManifest.xml`
-
-Create `YourExtension/src/main/AndroidManifest.xml`:
+### Step 3: Create AndroidManifest.xml
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required permissions -->
+    <!-- Required permission -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application>
-        <!-- Extension metadata -->
+        <!-- ⚠️ CRITICAL: Main app scans for these meta-data tags -->
         <meta-data
             android:name="provider_name"
             android:value="${providerName}" />
@@ -157,6 +190,7 @@ Create `YourExtension/src/main/AndroidManifest.xml`:
             android:name="provider_version"
             android:value="${providerVersion}" />
         
+        <!-- ⚠️ CRITICAL: Fully qualified class name -->
         <meta-data
             android:name="provider_class"
             android:value="${providerClass}" />
@@ -164,284 +198,160 @@ Create `YourExtension/src/main/AndroidManifest.xml`:
 </manifest>
 ```
 
-### Step 4: Implement the Provider
-
-Create `YourProvider.kt`:
+### Step 4: Implement Provider Class
 
 ```kotlin
-package com.yourname.extension.yourextension
+package com.yourname.extensions.yourextension
 
 import android.content.Context
 import com.shawken.app.api.*
-import org.jsoup.Jsoup
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.jsoup.Jsoup
 
 class YourProvider(context: Context) : Provider(context) {
 
-    // Required metadata
+    // ⚠️ REQUIRED: Provider metadata
     override val name = "Your Provider Name"
     override val lang = "en"
     override val baseUrl = "https://example.com"
-    override val description = "Description of your provider"
-    override val iconUrl = "https://example.com/icon.png"
+    override val description = "Streams from example.com"
+    override val iconUrl = "https://example.com/icon.png"  // Optional
 
-    // Capabilities
+    // ⚠️ REQUIRED: Capability flags
     override val supportsSearch = true
-    override val supportsLatest = true
+    override val supportsLatest = false
     override val supportsTrending = false
 
-    // HTTP client for making requests
     private val client = OkHttpClient()
 
-    /**
-     * Search for content
-     */
+    // ⚠️ REQUIRED: Search implementation
     override suspend fun search(
         query: String,
         page: Int,
         filters: Map<String, String>
     ): SearchResponse {
-        // Build search URL
-        val searchUrl = "$baseUrl/search?q=$query&page=$page"
+        val url = "$baseUrl/search?q=$query&page=$page"
+        val html = client.newCall(Request.Builder().url(url).build())
+            .execute().body?.string() ?: ""
         
-        // Make HTTP request
-        val response = client.newCall(
-            okhttp3.Request.Builder()
-                .url(searchUrl)
-                .build()
-        ).execute()
-        
-        // Parse HTML
-        val document = Jsoup.parse(response.body?.string() ?: "")
-        
-        // Extract search results
-        val results = document.select(".search-result").map { element ->
+        val doc = Jsoup.parse(html)
+        val results = doc.select(".result-item").map { el ->
             SearchResult(
-                name = element.select(".title").text(),
-                url = element.select("a").attr("href"),
-                posterUrl = element.select("img").attr("src"),
-                type = ContentType.MOVIE, // or TV_SERIES, ANIME, etc.
-                quality = element.select(".quality").text(),
-                year = element.select(".year").text().toIntOrNull()
+                name = el.select(".title").text(),
+                url = el.select("a").attr("abs:href"),
+                posterUrl = el.select("img").attr("abs:src"),
+                type = ContentType.MOVIE,
+                quality = el.select(".badge").text(),
+                year = el.select(".year").text().toIntOrNull()
             )
         }
-        
-        // Check if there's a next page
-        val hasNextPage = document.select(".next-page").isNotEmpty()
         
         return SearchResponse(
             results = results,
-            hasNextPage = hasNextPage
+            hasNextPage = doc.select(".next-page").isNotEmpty()
         )
     }
 
-    /**
-     * Load detailed information about a content item
-     */
+    // ⚠️ REQUIRED: Load details implementation
     override suspend fun load(url: String): LoadResponse {
-        // Make HTTP request
-        val response = client.newCall(
-            okhttp3.Request.Builder()
-                .url(url)
-                .build()
-        ).execute()
+        val html = client.newCall(Request.Builder().url(url).build())
+            .execute().body?.string() ?: ""
+        val doc = Jsoup.parse(html)
         
-        // Parse HTML
-        val document = Jsoup.parse(response.body?.string() ?: "")
-        
-        // Determine if it's a movie or TV series
-        val isMovie = document.select(".movie-indicator").isNotEmpty()
-        
-        return if (isMovie) {
-            // Movie
-            MovieLoadResponse(
-                name = document.select(".title").text(),
-                url = url,
-                dataUrl = document.select(".watch-button").attr("data-url"),
-                posterUrl = document.select(".poster img").attr("src"),
-                year = document.select(".year").text().toIntOrNull(),
-                plot = document.select(".plot").text(),
-                rating = document.select(".rating").text().toFloatOrNull(),
-                tags = document.select(".genre").map { it.text() },
-                duration = document.select(".duration").text().toIntOrNull()
-            )
-        } else {
-            // TV Series
-            val episodes = document.select(".episode").map { ep ->
-                Episode(
-                    name = ep.select(".ep-title").text(),
-                    season = ep.attr("data-season").toInt(),
-                    episode = ep.attr("data-episode").toInt(),
-                    dataUrl = ep.select("a").attr("href"),
-                    posterUrl = ep.select("img").attr("src"),
-                    description = ep.select(".description").text()
-                )
-            }
-            
-            TvSeriesLoadResponse(
-                name = document.select(".title").text(),
-                url = url,
-                posterUrl = document.select(".poster img").attr("src"),
-                year = document.select(".year").text().toIntOrNull(),
-                plot = document.select(".plot").text(),
-                rating = document.select(".rating").text().toFloatOrNull(),
-                tags = document.select(".genre").map { it.text() },
-                episodes = episodes
-            )
-        }
+        // Example for movie
+        return MovieLoadResponse(
+            name = doc.select("h1.title").text(),
+            url = url,
+            dataUrl = doc.select("#watch-button").attr("data-url"),
+            posterUrl = doc.select(".poster").attr("abs:src"),
+            year = doc.select(".year").text().toIntOrNull(),
+            plot = doc.select(".synopsis").text(),
+            rating = doc.select(".rating").text().toFloatOrNull(),
+            tags = doc.select(".genre").map { it.text() },
+            duration = doc.select(".duration").text().toIntOrNull()
+        )
     }
 
-    /**
-     * Extract streaming links from a data URL
-     */
+    // ⚠️ REQUIRED: Extract streaming links
     override suspend fun loadLinks(dataUrl: String): List<ExtractorLink> {
-        // Make HTTP request to get the video page
-        val response = client.newCall(
-            okhttp3.Request.Builder()
-                .url(dataUrl)
-                .build()
-        ).execute()
+        val html = client.newCall(Request.Builder().url(dataUrl).build())
+            .execute().body?.string() ?: ""
+        val doc = Jsoup.parse(html)
         
-        // Parse HTML
-        val document = Jsoup.parse(response.body?.string() ?: "")
-        
-        // Extract video links
-        val links = mutableListOf<ExtractorLink>()
-        
-        // Example: Direct MP4 links
-        document.select(".video-source").forEach { source ->
-            val videoUrl = source.attr("src")
-            val quality = source.attr("data-quality").toIntOrNull() ?: 0
-            
-            links.add(
-                ExtractorLink(
-                    source = name,
-                    name = "$name - ${quality}p",
-                    url = videoUrl,
-                    referer = baseUrl,
-                    quality = quality,
-                    isM3u8 = videoUrl.contains(".m3u8"),
-                    headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0",
-                        "Referer" to baseUrl
-                    )
-                )
+        return doc.select("source[src]").map { source ->
+            ExtractorLink(
+                source = name,
+                name = "$name - ${source.attr("data-quality")}",
+                url = source.attr("abs:src"),
+                referer = baseUrl,
+                quality = source.attr("data-quality").toIntOrNull() ?: 0,
+                isM3u8 = source.attr("src").contains(".m3u8"),
+                headers = mapOf("Referer" to baseUrl)
             )
         }
-        
-        return links
-    }
-
-    /**
-     * Get main page content (optional)
-     */
-    override suspend fun getMainPage(): HomePageResponse {
-        val response = client.newCall(
-            okhttp3.Request.Builder()
-                .url(baseUrl)
-                .build()
-        ).execute()
-        
-        val document = Jsoup.parse(response.body?.string() ?: "")
-        
-        val sections = mutableListOf<HomePageList>()
-        
-        // Trending section
-        val trending = document.select(".trending .item").map { item ->
-            SearchResult(
-                name = item.select(".title").text(),
-                url = item.select("a").attr("href"),
-                posterUrl = item.select("img").attr("src"),
-                type = ContentType.MOVIE
-            )
-        }
-        
-        if (trending.isNotEmpty()) {
-            sections.add(HomePageList("Trending", trending))
-        }
-        
-        return HomePageResponse(sections)
     }
 }
 ```
 
-### Step 5: Add Extension to Settings
-
-Add your extension module to `settings.gradle.kts`:
+### Step 5: Add to settings.gradle.kts
 
 ```kotlin
 include(":app")
-include(":YourExtensionName")  // Add this line
+include(":extension-api")
+include(":extensions:YourExtension")  // Add this
 ```
 
-### Step 6: Build the Extension APK
-
-Run in terminal:
+### Step 6: Build Extension APK
 
 ```bash
-./gradlew :YourExtensionName:assembleRelease
+./gradlew :extensions:YourExtension:assembleRelease
 ```
 
-The APK will be generated at:
-```
-YourExtensionName/build/outputs/apk/release/YourExtensionName-release.apk
-```
+APK location: `extensions/YourExtension/build/outputs/apk/release/YourExtension-release.apk`
 
 ---
 
-## 📚 Provider Interface Reference
+## 📚 Complete API Reference
 
-### Required Properties
+### Provider Abstract Class
 
-```kotlin
-abstract val name: String              // Provider name (e.g., "Example Provider")
-abstract val lang: String              // Language code (e.g., "en", "es")
-abstract val baseUrl: String           // Base URL of the source
-open val description: String = ""      // Provider description
-open val iconUrl: String = ""          // Icon URL
-```
-
-### Capability Flags
+**Location**: `extension-api/src/main/java/com/shawken/app/api/Provider.kt`
 
 ```kotlin
-open val supportsSearch: Boolean = true      // Can search
-open val supportsLatest: Boolean = false     // Has latest content
-open val supportsTrending: Boolean = false   // Has trending content
+abstract class Provider(val context: Context) {
+    // Required properties
+    abstract val name: String
+    abstract val lang: String
+    abstract val baseUrl: String
+    
+    // Optional properties
+    open val description: String = ""
+    open val iconUrl: String = ""
+    open val supportsSearch: Boolean = true
+    open val supportsLatest: Boolean = false
+    open val supportsTrending: Boolean = false
+    
+    // Required methods
+    abstract suspend fun search(query: String, page: Int = 1, filters: Map<String, String> = emptyMap()): SearchResponse
+    abstract suspend fun load(url: String): LoadResponse
+    abstract suspend fun loadLinks(dataUrl: String): List<ExtractorLink>
+    
+    // Optional methods
+    open suspend fun getMainPage(): HomePageResponse = HomePageResponse(emptyList())
+    open suspend fun getFilters(): List<Filter> = emptyList()
+    
+    // ⚠️ IMPORTANT: TMDB integration method
+    open suspend fun searchByTitleYear(title: String, year: Int?, type: ContentType): SearchResult? {
+        // Default implementation searches and matches by year ±2
+        // Override for better accuracy
+    }
+}
 ```
 
-### Required Methods
+### Data Classes
 
-```kotlin
-// Search for content
-abstract suspend fun search(
-    query: String,
-    page: Int = 1,
-    filters: Map<String, String> = emptyMap()
-): SearchResponse
-
-// Load detailed information
-abstract suspend fun load(url: String): LoadResponse
-
-// Extract streaming links
-abstract suspend fun loadLinks(dataUrl: String): List<ExtractorLink>
-```
-
-### Optional Methods
-
-```kotlin
-// Get main page content
-open suspend fun getMainPage(): HomePageResponse
-
-// Get available filters
-open suspend fun getFilters(): List<Filter>
-```
-
----
-
-## 📦 Data Classes Reference
-
-### SearchResponse
-
+**SearchResponse**
 ```kotlin
 data class SearchResponse(
     val results: List<SearchResult>,
@@ -449,21 +359,19 @@ data class SearchResponse(
 )
 ```
 
-### SearchResult
-
+**SearchResult**
 ```kotlin
 data class SearchResult(
-    val name: String,              // Title
-    val url: String,               // URL to load details
-    val posterUrl: String? = null, // Poster image URL
-    val type: ContentType,         // MOVIE, TV_SERIES, ANIME, etc.
-    val quality: String? = null,   // Quality badge (e.g., "HD", "4K")
-    val year: Int? = null          // Release year
+    val name: String,              // Required
+    val url: String,               // Required - URL to pass to load()
+    val posterUrl: String? = null,
+    val type: ContentType = ContentType.OTHER,
+    val quality: String? = null,   // e.g., "HD", "CAM", "4K"
+    val year: Int? = null
 )
 ```
 
-### ContentType
-
+**ContentType enum**
 ```kotlin
 enum class ContentType {
     MOVIE,
@@ -474,27 +382,41 @@ enum class ContentType {
 }
 ```
 
-### LoadResponse (Sealed Class)
+**LoadResponse (sealed class)**
 
-#### MovieLoadResponse
+Base class:
+```kotlin
+sealed class LoadResponse {
+    abstract val name: String
+    abstract val url: String
+    abstract val posterUrl: String?
+    abstract val year: Int?
+    abstract val plot: String?
+    abstract val rating: Float?  // 0.0 to 10.0
+    abstract val tags: List<String>
+    abstract val type: ContentType
+}
+```
 
+Movie variant:
 ```kotlin
 data class MovieLoadResponse(
     override val name: String,
     override val url: String,
-    val dataUrl: String,                    // URL to extract links from
+    val dataUrl: String,  // ⚠️ CRITICAL: URL to pass to loadLinks()
     override val posterUrl: String? = null,
     override val year: Int? = null,
     override val plot: String? = null,
-    override val rating: Float? = null,     // 0-10
+    override val rating: Float? = null,
     override val tags: List<String> = emptyList(),
-    val duration: Int? = null,              // Duration in minutes
+    val duration: Int? = null,  // Minutes
     val recommendations: List<SearchResult> = emptyList()
-) : LoadResponse()
+) : LoadResponse() {
+    override val type = ContentType.MOVIE
+}
 ```
 
-#### TvSeriesLoadResponse
-
+TV Series variant:
 ```kotlin
 data class TvSeriesLoadResponse(
     override val name: String,
@@ -504,68 +426,63 @@ data class TvSeriesLoadResponse(
     override val plot: String? = null,
     override val rating: Float? = null,
     override val tags: List<String> = emptyList(),
-    val episodes: List<Episode> = emptyList(),
+    val episodes: List<Episode> = emptyList(),  // ⚠️ CRITICAL
     val recommendations: List<SearchResult> = emptyList()
-) : LoadResponse()
+) : LoadResponse() {
+    override val type = ContentType.TV_SERIES
+}
 ```
 
-### Episode
-
+**Episode**
 ```kotlin
 data class Episode(
-    val name: String,              // Episode title
-    val season: Int,               // Season number
-    val episode: Int,              // Episode number
-    val dataUrl: String,           // URL to extract links from
-    val posterUrl: String? = null, // Episode thumbnail
+    val name: String,
+    val season: Int,
+    val episode: Int,
+    val dataUrl: String,  // ⚠️ CRITICAL: URL to pass to loadLinks()
+    val posterUrl: String? = null,
     val description: String? = null,
-    val date: String? = null       // Air date
+    val date: String? = null  // Air date
 )
 ```
 
-### ExtractorLink
-
+**ExtractorLink**
 ```kotlin
 data class ExtractorLink(
-    val source: String,                    // Source name
-    val name: String,                      // Display name
-    val url: String,                       // Streaming URL
-    val referer: String = "",              // Referer header
-    val quality: Int = 0,                  // Quality (1080, 720, etc.)
-    val isM3u8: Boolean = false,           // Is HLS stream
+    val source: String,      // Server name
+    val name: String,        // Display name
+    val url: String,         // ⚠️ CRITICAL: Actual video URL
+    val referer: String = "",
+    val quality: Int = 0,    // 1080, 720, 480, etc.
+    val isM3u8: Boolean = false,  // ⚠️ Set true for HLS streams
     val headers: Map<String, String> = emptyMap()
 )
 ```
 
-### SubtitleFile
-
+**SubtitleFile**
 ```kotlin
 data class SubtitleFile(
     val url: String,
-    val lang: String,                      // Language code
+    val lang: String,  // ISO 639-1 code
     val format: SubtitleFormat = SubtitleFormat.SRT
 )
 
-enum class SubtitleFormat {
-    SRT, VTT, ASS
-}
+enum class SubtitleFormat { SRT, VTT, ASS }
 ```
 
-### HomePageResponse
-
+**HomePageResponse**
 ```kotlin
 data class HomePageResponse(
     val items: List<HomePageList>
 )
 
 data class HomePageList(
-    val name: String,              // Section name (e.g., "Trending")
+    val name: String,  // Section title
     val list: List<SearchResult>
 )
 ```
 
-### Filter (Sealed Class)
-
+**Filter (sealed class)**
 ```kotlin
 sealed class Filter {
     abstract val name: String
@@ -594,210 +511,327 @@ sealed class Filter {
 
 ---
 
-## 💡 Example Extension
+## 🔗 Main App Integration
 
-Here's a complete minimal example:
+### How Main App Finds Extensions
 
+**ExtensionManager.findInstalledExtensionPackages()**
 ```kotlin
-package com.example.testprovider
+// Scans all installed packages
+val installedPackages = context.packageManager.getInstalledPackages(PackageManager.GET_META_DATA)
 
-import android.content.Context
-import com.shawken.app.api.*
-
-class TestProvider(context: Context) : Provider(context) {
-
-    override val name = "Test Provider"
-    override val lang = "en"
-    override val baseUrl = "https://test.com"
-
-    override suspend fun search(
-        query: String,
-        page: Int,
-        filters: Map<String, String>
-    ): SearchResponse {
-        // Return hardcoded test data
-        return SearchResponse(
-            results = listOf(
-                SearchResult(
-                    name = "Test Movie",
-                    url = "$baseUrl/movie/1",
-                    posterUrl = "https://via.placeholder.com/300x450",
-                    type = ContentType.MOVIE,
-                    quality = "HD",
-                    year = 2024
-                )
-            ),
-            hasNextPage = false
-        )
-    }
-
-    override suspend fun load(url: String): LoadResponse {
-        return MovieLoadResponse(
-            name = "Test Movie",
-            url = url,
-            dataUrl = "$baseUrl/watch/1",
-            posterUrl = "https://via.placeholder.com/300x450",
-            year = 2024,
-            plot = "This is a test movie",
-            rating = 8.5f,
-            tags = listOf("Action", "Adventure"),
-            duration = 120
-        )
-    }
-
-    override suspend fun loadLinks(dataUrl: String): List<ExtractorLink> {
-        return listOf(
-            ExtractorLink(
-                source = name,
-                name = "$name - 1080p",
-                url = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-                quality = 1080,
-                isM3u8 = false
-            )
-        )
+// Filters for packages with "provider_class" metadata
+for (pkgInfo in installedPackages) {
+    val metadata = pkgInfo.applicationInfo?.metaData
+    if (metadata?.containsKey("provider_class") == true) {
+        // Found an extension!
     }
 }
 ```
 
----
+### How Main App Loads Extensions
 
-## 🧪 Testing Your Extension
+**ExtensionManager.loadProvider(packageName)**
+```kotlin
+// 1. Get package info
+val pkgInfo = context.packageManager.getPackageInfo(packageName, PackageManager.GET_META_DATA)
+val providerClass = pkgInfo.applicationInfo.metaData.getString("provider_class")
 
-### 1. Local Testing
+// 2. Create package context
+val extensionContext = context.createPackageContext(
+    packageName,
+    Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY
+)
 
-Build and install your extension APK:
+// 3. Load class with custom ClassLoader
+val classLoader = PathClassLoader(
+    extensionContext.packageCodePath,
+    extensionContext.applicationInfo.nativeLibraryDir,
+    context.classLoader  // ⚠️ Parent is main app's ClassLoader
+)
 
-```bash
-./gradlew :YourExtension:assembleDebug
-adb install YourExtension/build/outputs/apk/debug/YourExtension-debug.apk
+val loadedClass = classLoader.loadClass(providerClass)
+val constructor = loadedClass.getConstructor(Context::class.java)
+val provider = constructor.newInstance(extensionContext) as Provider
 ```
 
-### 2. In-App Testing
+### How Main App Uses Extensions
+
+**Search Flow**:
+```kotlin
+// User searches for "Stranger Things"
+val providers = extensionManager.getProviders()
+providers.forEach { provider ->
+    val results = provider.search("Stranger Things", page = 1)
+    // Display results in UI
+}
+```
+
+**Details Flow**:
+```kotlin
+// User clicks on a search result
+val loadResponse = provider.load(searchResult.url)
+when (loadResponse) {
+    is MovieLoadResponse -> {
+        // Show movie details
+        // dataUrl is stored for playback
+    }
+    is TvSeriesLoadResponse -> {
+        // Show episode list
+        // Each episode.dataUrl is stored
+    }
+}
+```
+
+**Playback Flow**:
+```kotlin
+// User clicks play
+val links = provider.loadLinks(dataUrl)  // dataUrl from MovieLoadResponse or Episode
+val bestLink = links.maxByOrNull { it.quality }
+// Pass link.url to ExoPlayer
+```
+
+### TMDB Integration
+
+Main app uses TMDB for metadata, then calls:
+```kotlin
+val searchResult = provider.searchByTitleYear(
+    title = "Stranger Things",
+    year = 2016,
+    type = ContentType.TV_SERIES
+)
+```
+
+Default implementation in Provider does fuzzy matching (±2 years). Override for better accuracy.
+
+---
+
+## 🎓 Advanced Topics
+
+### Error Handling
+
+Always wrap in try-catch:
+```kotlin
+override suspend fun search(...): SearchResponse {
+    return try {
+        // Implementation
+    } catch (e: Exception) {
+        Log.e("YourProvider", "Search failed", e)
+        SearchResponse(emptyList(), false)
+    }
+}
+```
+
+### Custom Headers & Cookies
+
+```kotlin
+private val client = OkHttpClient.Builder()
+    .addInterceptor { chain ->
+        val request = chain.request().newBuilder()
+            .header("User-Agent", "Mozilla/5.0...")
+            .header("Referer", baseUrl)
+            .build()
+        chain.proceed(request)
+    }
+    .cookieJar(/* your cookie jar */)
+    .build()
+```
+
+### Handling Pagination
+
+```kotlin
+override suspend fun search(query: String, page: Int, ...): SearchResponse {
+    val url = "$baseUrl/search?q=$query&page=$page"
+    // ...
+    val hasNextPage = doc.select(".pagination .next").isNotEmpty()
+    return SearchResponse(results, hasNextPage)
+}
+```
+
+### TV Series with Multiple Seasons
+
+```kotlin
+val episodes = mutableListOf<Episode>()
+doc.select(".season").forEach { seasonEl ->
+    val seasonNum = seasonEl.attr("data-season").toInt()
+    seasonEl.select(".episode").forEach { epEl ->
+        episodes.add(Episode(
+            name = epEl.select(".title").text(),
+            season = seasonNum,
+            episode = epEl.attr("data-episode").toInt(),
+            dataUrl = epEl.select("a").attr("abs:href")
+        ))
+    }
+}
+```
+
+### M3U8 / HLS Streams
+
+```kotlin
+ExtractorLink(
+    source = name,
+    name = "$name - Auto",
+    url = "https://example.com/playlist.m3u8",
+    isM3u8 = true,  // ⚠️ CRITICAL: Tells player to use HLS
+    quality = 0  // Auto quality
+)
+```
+
+### Subtitles
+
+```kotlin
+// In loadLinks, also return subtitles if available
+val subtitles = doc.select("track[kind=subtitles]").map {
+    SubtitleFile(
+        url = it.attr("abs:src"),
+        lang = it.attr("srclang"),
+        format = SubtitleFormat.VTT
+    )
+}
+// Note: Current API doesn't return subtitles from loadLinks
+// You may need to add them to ExtractorLink or extend the API
+```
+
+---
+
+## 🧪 Testing & Debugging
+
+### Local Testing
+
+```bash
+# Build debug APK
+./gradlew :extensions:YourExtension:assembleDebug
+
+# Install on device/emulator
+adb install extensions/YourExtension/build/outputs/apk/debug/YourExtension-debug.apk
+
+# View logs
+adb logcat | grep "YourProvider"
+```
+
+### In-App Testing
 
 1. Open Shawken app
-2. Go to **Extensions** screen
-3. Tap **Install from file**
-4. Select your extension APK
-5. Verify it appears in the installed list
-6. Test search, load, and playback functionality
+2. Navigate to Extensions screen
+3. Your extension should appear in "Installed" tab
+4. Try searching
+5. Try loading details
+6. Try playing a video
 
-### 3. Debugging
+### Common Issues
 
-Add logging to your extension:
+**Extension not appearing**:
+- Check AndroidManifest.xml has all 4 meta-data tags
+- Verify `provider_class` is fully qualified name
+- Check `adb logcat` for errors
 
-```kotlin
-import android.util.Log
+**ClassCastException**:
+- Ensure you're extending `Provider` from `com.shawken.app.api`
+- Check that `compileOnly(project(":extension-api"))` is in build.gradle
 
-class YourProvider(context: Context) : Provider(context) {
-    private val TAG = "YourProvider"
-    
-    override suspend fun search(...): SearchResponse {
-        Log.d(TAG, "Searching for: $query")
-        // ... implementation
-    }
-}
-```
-
-View logs:
-```bash
-adb logcat | grep YourProvider
-```
+**No search results**:
+- Add logging to see what HTML you're getting
+- Test selectors in browser DevTools first
+- Check if site requires headers/cookies
 
 ---
 
-## 📤 Publishing Your Extension
+## 📤 Publishing
 
-### Option 1: GitHub Releases
+### Option 1: Direct APK Distribution
 
-1. Create a GitHub repository for your extension
-2. Build release APK
-3. Create a new release
-4. Upload the APK
-5. Share the download link
+1. Build release APK:
+```bash
+./gradlew :extensions:YourExtension:assembleRelease
+```
+
+2. Sign APK (required for distribution):
+```bash
+# Generate keystore (once)
+keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-key-alias
+
+# Sign APK
+jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore my-release-key.jks app-release-unsigned.apk my-key-alias
+```
+
+3. Upload to GitHub Releases or your website
 
 ### Option 2: Extension Repository
 
-Create a `repo.json` file:
-
+Create `repo.json`:
 ```json
 {
-  "name": "Your Extension Repository",
-  "description": "Collection of extensions",
+  "name": "My Extension Repository",
+  "description": "Collection of streaming extensions",
   "author": "Your Name",
   "url": "https://yoursite.com/repo.json",
-  "version": "1.0.0",
+  "version": 1,
   "extensions": [
     {
       "name": "Your Provider",
-      "description": "Description",
-      "version": "1.0.0",
+      "description": "Streams from example.com",
+      "version": 1,
       "versionName": "1.0.0",
       "lang": "en",
       "apkUrl": "https://yoursite.com/extensions/yourprovider-v1.0.0.apk",
       "iconUrl": "https://yoursite.com/icons/yourprovider.png",
-      "sha256": "hash_of_your_apk",
-      "minAppVersion": "1.0.0",
+      "sha256": "abc123...",  // SHA-256 hash of APK
+      "minAppVersion": 1,
       "sources": ["https://example.com"]
     }
   ]
 }
 ```
 
-Host this JSON file and share the URL with users.
+Calculate SHA-256:
+```bash
+sha256sum yourprovider-v1.0.0.apk
+```
+
+Users add your repo URL in Shawken's Extensions screen.
 
 ---
 
-## ✅ Best Practices
+## 🔧 Troubleshooting
 
-### 1. Error Handling
+### Build Errors
 
-Always wrap network calls in try-catch:
+**"Cannot resolve symbol Provider"**
+- Add `compileOnly(project(":extension-api"))` to dependencies
+- Sync Gradle
 
-```kotlin
-override suspend fun search(...): SearchResponse {
-    return try {
-        // Your implementation
-    } catch (e: Exception) {
-        Log.e(TAG, "Search failed", e)
-        SearchResponse(emptyList(), false)
-    }
-}
-```
+**"Duplicate class found"**
+- Make sure you're using `compileOnly` not `implementation` for extension-api
 
-### 2. Respect Rate Limits
+### Runtime Errors
 
-Add delays between requests if needed:
+**Extension loads but crashes on search**
+- Check network permissions in AndroidManifest
+- Wrap code in try-catch
+- Check logs for stack trace
 
-```kotlin
-import kotlinx.coroutines.delay
+**"No extensions installed" but APK is installed**
+- Verify all 4 meta-data tags in AndroidManifest
+- Check `provider_class` matches actual class name
+- Reinstall extension
 
-override suspend fun search(...): SearchResponse {
-    delay(500) // 500ms delay
-    // ... implementation
-}
-```
+**Video won't play**
+- Verify `ExtractorLink.url` is valid (test in browser)
+- Check if `isM3u8` flag is correct
+- Verify headers/referer are set if required
+- Check if URL needs to be decoded
 
-### 3. User-Agent Headers
+---
 
-Always set a proper User-Agent:
+## 📞 Support & Resources
 
-```kotlin
-private val client = OkHttpClient.Builder()
-    .addInterceptor { chain ->
-        val request = chain.request().newBuilder()
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .build()
-        chain.proceed(request)
-    }
-    .build()
-```
+- **Source Code**: Check `extension-api/Provider.kt` for latest API
+- **Example**: See `extensions/TestProvider/` for working example
+- **Main App Code**: `app/extensions/ExtensionManager.kt` shows how extensions are loaded
 
-### 4. Cache Responses
+---
 
-Consider caching to reduce server load:
-
-```kotlin
-private val cache = mutableMapOf<String, SearchResponse>()
+**Happy Extension Development! 🚀**
 
 override suspend fun search(...): SearchResponse {
     val cacheKey = "$query-$page"

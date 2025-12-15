@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.shawken.xprime"
+    namespace = "com.shawken.scloud"
     compileSdk = 36
 
     defaultConfig {
@@ -44,6 +44,6 @@ dependencies {
     // Networking
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
-    // JSON
-    implementation("org.json:json:20231013")
+    // HTML Parsing
+    implementation("org.jsoup:jsoup:1.17.2")
 }

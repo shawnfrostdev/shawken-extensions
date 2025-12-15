@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <uses-permission android:name="android.permission.INTERNET" />
+    
+    <application>
+        <!-- Shawken Plugin Metadata -->
+        <meta-data
+            android:name="shawken_plugin"
+            android:value="com.shawken.scloud.SCloudPlugin" />
+    </application>
+</manifest>

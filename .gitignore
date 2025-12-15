@@ -1,0 +1,58 @@
+# CloudStream reference repository (not part of Shawken extensions)
+cloudstream-extensions-phisher/
+
+# Build files
+*.apk
+*.aab
+build/
+.gradle/
+.idea/
+.kotlin/
+local.properties
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python files (scraping scripts)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# HTML scraping output
+*.html
+!docs/*.html
